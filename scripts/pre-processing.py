@@ -160,6 +160,10 @@ def setup_datasets(gd_df, er_df):
     train_df = other_df.drop(validation_df.index)
     train_df.reset_index(drop=True, inplace=True)
 
+    # Dropping labal columns in test and validation datasets
+    test_df.drop(columns=["label"], inplace=True)
+    validation_df.drop(columns=["label"], inplace=True)
+
     return train_df, test_df, validation_df
 
 
