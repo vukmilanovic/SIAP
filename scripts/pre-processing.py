@@ -2,13 +2,9 @@ import pandas as pd
 import numpy as np
 import re
 
-GLASSDOOR_DATASET = (
-    r"C://Users/One/Desktop/Master/SIAP/Projekat/data/raw/glassdoor_reviews.csv"
-)
-EMPLOYEES_TEST_DATASET = r"C://Users/One/Desktop/Master/SIAP/Projekat/data/raw/test.csv"
-EMPLOYEES_TRAIN_DATASET = (
-    r"C://Users/One/Desktop/Master/SIAP/Projekat/data/raw/train.csv"
-)
+GLASSDOOR_DATASET = "./../data/raw/glassdoor_reviews.csv"
+EMPLOYEES_TEST_DATASET = "./../data/raw/test.csv"
+EMPLOYEES_TRAIN_DATASET = "./../data/raw/train.csv"
 PATTERN = r"[^a-zA-Z\s]"
 
 
