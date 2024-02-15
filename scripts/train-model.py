@@ -16,10 +16,12 @@ from keras.layers import (
 import pickle as pickle
 
 # finetuning
-from transformers import DistilBertTokenizerFast
-from transformers import TrainingArguments
-from transformers import AutoModelForSequenceClassification
-from transformers import Trainer
+from transformers import (
+    AutoTokenizer,
+    TrainingArguments,
+    AutoModelForSequenceClassification,
+    Trainer,
+)
 
 # Evaluation
 import datasets
@@ -41,7 +43,7 @@ def load_data():
 
 def train_distilbert_model(train_df):
     train_df = pd.DataFrame(train_df).dropna()
-    tokenizer = DistilBertTokenizerFast.from_pretrained("distilbert-base-cased")
+    tokenizer = AutoTokenizer.from_pretrained("distilbert-base-cased")
     train, eval = train_test_split(train_df, train_size=0.8, stratify=train_df["label"])
 
     pd.DataFrame(train).to_csv("../data/datasets/distilbert/train.csv", index=False)
@@ -57,7 +59,8 @@ def train_distilbert_model(train_df):
 
     def tokenize_data(data):
         return tokenizer(
-            pd.DataFrame(data["comment"]).dropna().values.tolist(), padding="max_length"
+            [str(comment) for comment in data["comment"] if comment is not None],
+            padding="max_length",
         )
 
     def transform_label(data):
@@ -77,9 +80,9 @@ def train_distilbert_model(train_df):
         f1 = f1_score(labels, predictions, average="weighted")
         return {"f1-score": f1}
 
-    datasets = datasets.map(tokenize_data, batched=True)
-    remove_columns = ["comment", "label"]
-    datasets = datasets.map(transform_label, remove_columns=remove_columns)
+    datasets = datasets.map(tokenize_data, batched=True, batch_size=256)
+    # remove_columns = ["comment", "label"]
+    # datasets = datasets.map(transform_label, remove_columns=remove_columns)
 
     train_dataset = datasets["train"].shuffle(seed=0)
     eval_dataset = datasets["eval"].shuffle(seed=0)
