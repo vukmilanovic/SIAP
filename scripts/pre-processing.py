@@ -27,11 +27,11 @@ def set_comment(row):
 
 def set_label(row):
     if row["overall_rating"] > 3:
-        return 2
+        return [1.0, 0.0, 0.0]
     elif row["overall_rating"] < 3:
-        return 0
+        return [0.0, 0.0, 1.0]
     else:
-        return 1
+        return [0.0, 1.0, 0.0]
 
 
 def process_glassdoor_df(glassdoor_ds):
@@ -154,31 +154,22 @@ def setup_datasets(gd_df, er_df):
     other_df = result_df.drop(test_df.index)
     other_df.reset_index(drop=True, inplace=True)
 
-    # Sampling other_df and creating training and validation datasets
-    validation_df = other_df.sample(frac=0.2, random_state=42)
-    validation_df.reset_index(drop=True, inplace=True)
-    train_df = other_df.drop(validation_df.index)
-    train_df.reset_index(drop=True, inplace=True)
-
-    # Dropping labal columns in test and validation datasets
     test_df.drop(columns=["label"], inplace=True)
-    validation_df.drop(columns=["label"], inplace=True)
 
-    return train_df, test_df, validation_df
+    return other_df, test_df
 
 
-def write(train_df, test_df, validation_df):
-    train_df.to_csv("./../data/train-dataset/train.csv", index=False)
-    test_df.to_csv("./../data/test-dataset/test.csv", index=False)
-    validation_df.to_csv("./../data/validation-dataset/validation.csv", index=False)
+def write(df, validation_df):
+    df.to_csv("./../data/processed/data.csv", index=False)
+    validation_df.to_csv("./../data/datasets/test.csv", index=False)
 
 
 def main():
     glassdoor_df, e_test_df, e_train_df = load()
     gd_df = process_glassdoor_df(glassdoor_df)
     er_df = process_employee_reviews_df(e_test_df, e_train_df)
-    train_df, test_df, validation_df = setup_datasets(gd_df, er_df)
-    write(train_df, test_df, validation_df)
+    df, validation_df = setup_datasets(gd_df, er_df)
+    write(df, validation_df)
 
 
 if __name__ == "__main__":
