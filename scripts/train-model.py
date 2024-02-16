@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-import tensorflow as tf
+from tqdm import tqdm
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 from scipy.special import softmax
@@ -32,7 +32,6 @@ from transformers import (
 import datasets
 from datasets import load_metric, load_dataset
 from sklearn.metrics import f1_score
-from huggingface_hub import notebook_login
 
 DATASET = "./../data/processed/data.csv"
 TEST_DATASET = "./../data/datasets/test.csv"
@@ -49,10 +48,11 @@ def load_data():
 def train_distilbert_model(train_df):
     train_df = pd.DataFrame(train_df).dropna()
     tokenizer = AutoTokenizer.from_pretrained("distilbert-base-cased")
-    train, eval = train_test_split(train_df, train_size=0.8, stratify=train_df["label"])
 
-    pd.DataFrame(train).to_csv("../data/datasets/distilbert/train.csv", index=False)
-    pd.DataFrame(eval).to_csv("../data/datasets/distilbert/eval.csv", index=False)
+    # train, eval = train_test_split(train_df, train_size=0.8, stratify=train_df["label"])
+
+    # pd.DataFrame(train).to_csv("../data/datasets/distilbert/train.csv", index=False)
+    # pd.DataFrame(eval).to_csv("../data/datasets/distilbert/eval.csv", index=False)
 
     datasets = load_dataset(
         "csv",
@@ -66,28 +66,22 @@ def train_distilbert_model(train_df):
         return tokenizer(
             [str(comment) for comment in data["comment"] if comment is not None],
             padding="max_length",
+            truncation=True,
         )
 
-    # def transform_label(data):
-    #     label = data["label"]
-    #     num = [0.0, 0.0, 1.0]
-    #     if label == "negative":  # Negative
-    #         num = [0.0, 0.0, 1.0]
-    #     elif label == "neutral":  # Neutral
-    #         num = [0.0, 1.0, 0.0]
-    #     else:  # Positive
-    #         num = [1.0, 0.0, 0.0]
-    #     return {"labels": num}
-
     def compute_metrics(eval_preds):
+        load_accuracy = load_metric("accuracy")
+        load_f1 = load_metric("f1")
+
         logits, labels = eval_preds
         predictions = np.argmax(logits, axis=-1)
-        f1 = f1_score(labels, predictions, average="weighted")
-        return {"f1-score": f1}
+        accuracy = load_accuracy.compute(predictions=predictions, references=labels)[
+            "accuracy"
+        ]
+        f1 = load_f1.compute(predictions=predictions, references=labels)["f1"]
+        return {"accuracy": accuracy, "f1": f1}
 
-    datasets = datasets.map(tokenize_data, batched=True, batch_size=256)
-    # remove_columns = ["comment", "label"]
-    # datasets = datasets.map(transform_label, remove_columns=remove_columns)
+    datasets = datasets.map(tokenize_data, batched=True)
 
     train_dataset = datasets["train"].shuffle(seed=0)
     eval_dataset = datasets["eval"].shuffle(seed=0)
@@ -190,7 +184,7 @@ def test_custom_model(test_df):
 
     # Tokenize and pad the input text
     text_sequence = tokenizer.texts_to_sequences(test_df["comment"])
-    text_sequence = pad_sequences(text_sequence, maxlen=100)
+    text_sequence = pad_sequences(text_sequence, maxlen=100, truncating="post")
 
     # Make a prediction using the trained model
     predicted_rating = model.predict(text_sequence)
@@ -198,11 +192,13 @@ def test_custom_model(test_df):
 
     def categories_to_string(cat):
         if cat == 0:
-            return "Positive"
+            return "Negative"
         elif cat == 1:
             return "Neutral"
+        elif cat == 2:
+            return "Positive"
         else:
-            return "Negative"
+            return "Unknown"
 
     vector_func = np.vectorize(categories_to_string)
     test_df["custom_model_sentiment"] = vector_func(array)
@@ -266,7 +262,7 @@ def main():
     # model, tokenizer = train_custom_model(train_df)
     # save_custom_model(model, tokenizer)
 
-    # print("Testing distilbert model...")
+    # print("Training DistilBert model...")
     # model, tokenizer = train_distilbert_model(train_df)
     # save_distilbert_model(model, tokenizer)
 
