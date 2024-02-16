@@ -3,6 +3,7 @@ import pandas as pd
 import tensorflow as tf
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
+from scipy.special import softmax
 from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
 from keras.models import Sequential, load_model
@@ -14,6 +15,9 @@ from keras.layers import (
     Dropout,
 )
 import pickle as pickle
+from textblob import TextBlob, Blobber
+from textblob.sentiments import NaiveBayesAnalyzer
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 # finetuning
 from transformers import (
@@ -21,6 +25,7 @@ from transformers import (
     TrainingArguments,
     AutoModelForSequenceClassification,
     Trainer,
+    AutoConfig,
 )
 
 # Evaluation
@@ -63,16 +68,16 @@ def train_distilbert_model(train_df):
             padding="max_length",
         )
 
-    def transform_label(data):
-        label = data["label"]
-        num = [0.0, 0.0, 1.0]
-        if label == "negative":  # Negative
-            num = [0.0, 0.0, 1.0]
-        elif label == "neutral":  # Neutral
-            num = [0.0, 1.0, 0.0]
-        else:  # Positive
-            num = [1.0, 0.0, 0.0]
-        return {"labels": num}
+    # def transform_label(data):
+    #     label = data["label"]
+    #     num = [0.0, 0.0, 1.0]
+    #     if label == "negative":  # Negative
+    #         num = [0.0, 0.0, 1.0]
+    #     elif label == "neutral":  # Neutral
+    #         num = [0.0, 1.0, 0.0]
+    #     else:  # Positive
+    #         num = [1.0, 0.0, 0.0]
+    #     return {"labels": num}
 
     def compute_metrics(eval_preds):
         logits, labels = eval_preds
@@ -205,21 +210,77 @@ def test_custom_model(test_df):
     return test_df
 
 
+def perform_textblob(test_df):
+    tb = Blobber(analyzer=NaiveBayesAnalyzer())
+
+    def classification_score(classification):
+        if classification == "pos":
+            return "Positive"
+        elif classification == "neg":
+            return "Negative"
+        else:
+            return "Neutral"
+
+    def sentiment_calc(text):
+        try:
+
+            return classification_score(tb(text).sentiment.classification)
+        except:
+            return None
+
+    test_df["textblob_sentiment"] = test_df["comment"].apply(sentiment_calc)
+
+    return test_df
+
+
+def perform_vader(test_df):
+    def polarity_score(compound):
+        if compound > 0.05:
+            return "Positive"
+        elif compound < -0.5:
+            return "Negative"
+        elif compound >= -0.05 and compound < 0.05:
+            return "Neutral"
+
+    def sentiment_calc(text):
+        analyzer = SentimentIntensityAnalyzer()
+        try:
+            return polarity_score(analyzer.polarity_scores(text)["compound"])
+        except:
+            return None
+
+    test_df["vader_sentiment"] = test_df["comment"].apply(sentiment_calc)
+
+    return test_df
+
+
 def write(test_df):
-    test_df.to_csv("./../data/datasets/test1.csv", index=False)
+    test_df.to_csv("./../data/datasets/result.csv", index=False)
 
 
 def main():
+    print("Loading data...")
     train_df, test_df = load_data()
+
+    # print("Training custom model...")
     # model, tokenizer = train_custom_model(train_df)
     # save_custom_model(model, tokenizer)
 
-    model, tokenizer = train_distilbert_model(train_df)
-    save_distilbert_model(model, tokenizer)
+    # print("Testing distilbert model...")
+    # model, tokenizer = train_distilbert_model(train_df)
+    # save_distilbert_model(model, tokenizer)
 
-    # test_df = pd.DataFrame(test_custom_model(test_df))
+    print("Performing custom model...")
+    test_df = pd.DataFrame(test_custom_model(test_df))
+    # print("Performing distilbert model ...")
     # test_df = pd.DataFrame(test_distilbert_model(test_df))
-    # write(test_df)
+    print("Performing TextBlob pre-trained model...")
+    test_df = pd.DataFrame(perform_textblob(test_df))
+    print("Performing VADER pre-trained model...")
+    test_df = pd.DataFrame(perform_vader(test_df))
+    print("Writing .csv file...")
+    write(test_df)
+    print("Finsihed.")
 
 
 if __name__ == "__main__":
