@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
+import matplotlib.pyplot as plt
+import seaborn as sb
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 from scipy.special import softmax
@@ -148,9 +149,19 @@ def train_custom_model(train_df):
     )
     model.summary()
 
-    model.fit(
+    history = model.fit(
         x_train, y_train, epochs=3, batch_size=256, validation_data=(x_eval, y_eval)
     )
+
+    plt.figure(figsize=(18, 6))
+    plt.plot(history.history["accuracy"], label="Train Accuracy", marker="o")
+    plt.plot(history.history["val_accuracy"], label="Validation Accuracy", marker="o")
+    plt.title("Model Accuracy over Epochs")
+    plt.xlabel("Epoch")
+    plt.ylabel("Accuracy")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
 
     y_pred = np.argmax(model.predict(x_eval), axis=-1)
     print("Accuracy:", accuracy_score(np.argmax(y_eval, axis=-1), y_pred))
@@ -230,6 +241,8 @@ def perform_textblob(test_df):
 
 
 def perform_vader(test_df):
+    compound_scores = list()
+
     def polarity_score(compound):
         if compound > 0.05:
             return "Positive"
@@ -241,11 +254,14 @@ def perform_vader(test_df):
     def sentiment_calc(text):
         analyzer = SentimentIntensityAnalyzer()
         try:
-            return polarity_score(analyzer.polarity_scores(text)["compound"])
+            compound = analyzer.polarity_scores(text)["compound"]
+            compound_scores.append(compound)
+            return polarity_score(compound)
         except:
             return None
 
     test_df["vader_sentiment"] = test_df["comment"].apply(sentiment_calc)
+    test_df["vader_compound"] = pd.DataFrame(compound_scores)
 
     return test_df
 
